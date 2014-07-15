@@ -1,7 +1,7 @@
 Puppet-twemproxy
 ================
 
-This module manages [Twemproxy](http://www.github.com/twitter/twemproxy) package installation from source. It takes into consideration the needed packages depending on the Distro yso you can compile it.
+This module manages [Twemproxy](http://www.github.com/twitter/twemproxy) package installation from source. It takes into consideration the needed packages depending on the Distro you can compile it.
 
 ## USAGE
 ### Creating a pool
@@ -24,7 +24,7 @@ This module manages [Twemproxy](http://www.github.com/twitter/twemproxy) package
         }
       ],
       port       => 22121,
-      statsport: => 22122
+      statsport => 22122
   }
 </pre>
 
