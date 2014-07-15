@@ -1,6 +1,6 @@
 #!/bin/sh
 ### BEGIN INIT INFO
-# Provides:          <%= name %>
+# Provides:          nutcracker
 # Required-Start:    $network $remote_fs $local_fs
 # Required-Stop:     $network $remote_fs $local_fs
 # Default-Start:     2 3 4 5
@@ -9,14 +9,14 @@
 ### END INIT INFO
 
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
-DESC=<%= name %>
-NAME=<%= name %>
+DESC=nutcracker
+NAME=nutcracker
 CONFFILE=/etc/nutcracker/<%= name %>.yml
 LOGFILE=/var/log/nutcracker/<%= name %>.log
 DAEMON=/usr/local/bin/nutcracker
 PIDFILE=/var/run/nutcracker/$NAME.pid
+RUNDIR=$(dirname ${PIDFILE})
 DAEMON_ARGS="-c $CONFFILE -o $LOGFILE -p $PIDFILE -s <%= statsport %> -d"
-#DAEMON_ARGS="-c $CONFFILE -p $PIDFILE -s <%= statsport %> -d"
 SCRIPTNAME=/etc/init.d/$NAME
 
 [ -x $DAEMON ] || exit 0
@@ -27,72 +27,61 @@ SCRIPTNAME=/etc/init.d/$NAME
 
 . /lib/lsb/init-functions
 
-do_start()
-{
-    start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON -- \
-        $DAEMON_ARGS
-    RETVAL="$?"
-    return "$RETVAL"
-}
-
-do_stop()
-{
-    # Return
-    #   0 if daemon has been stopped
-    #   1 if daemon was already stopped
-    #   2 if daemon could not be stopped
-    #   other if a failure occurred
-
-    kill -9 `cat ${PIDFILE}`
-    RETVAL="$?"
-    rm -f ${PIDFILE}
-    return "$RETVAL"
-}
+if [ -r /etc/default/$NAME ]
+then
+	. /etc/default/$NAME
+fi
 
 case "$1" in
-    start)
-        [ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC " "$NAME"
-        do_start
-        case "$?" in
-            0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
-            2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
-        esac
-        ;;
-    stop)
-        [ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
-        do_stop
-        case "$?" in
-            0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
-            2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
-        esac
-        ;;
-    status)
-        ps -ef | grep `cat ${PIDFILE}`
-        case "$?" in
-            0|1)
-                echo "Twemproxy ${NAME} is running..."
-            ;;
-            2)
-                echo "Twemproxy ${NAME} isn't running..."
-            ;;
-         esac
-        ;;
-    restart)
-        log_daemon_msg "Restarting $DESC" "$NAME"
-        do_stop
-        echo "Twemproxy has stopped..."
-        do_start
-                case "$?" in
-                    0) log_end_msg 0 ;;
-                    1) log_end_msg 1 ;; # Old process is still running
-                    *) log_end_msg 1 ;; # Failed to start
-                esac
-    ;;
-    *)
-        echo "Usage: $SCRIPTNAME {start|stop|status|restart}" >&2
-        exit 3
-        ;;
+  start)
+	echo -n "Starting $DESC: "
+	mkdir -p $RUNDIR
+	touch $PIDFILE
+	chmod 755 $RUNDIR
+
+	if [ -n "$ULIMIT" ]
+	then
+		ulimit -n $ULIMIT
+	fi
+
+	if start-stop-daemon --start --quiet --umask 007 --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_ARGS
+	then
+		echo "$NAME."
+	else
+		echo "failed"
+	fi
+	;;
+  stop)
+	echo -n "Stopping $DESC: "
+	if start-stop-daemon --stop --retry forever/TERM/1 --quiet --oknodo --pidfile $PIDFILE --exec $DAEMON
+	then
+		echo "$NAME."
+	else
+		echo "failed"
+	fi
+	rm -f $PIDFILE
+	sleep 1
+	;;
+
+  restart|force-reload)
+	${0} stop
+	${0} start
+	;;
+
+  status)
+	echo -n "$DESC is "
+	if start-stop-daemon --stop --quiet --signal 0 --name ${NAME} --pidfile ${PIDFILE}
+	then
+		echo "running"
+	else
+		echo "not running"
+		exit 1
+	fi
+	;;
+
+  *)
+	echo "Usage: /etc/init.d/$NAME {start|stop|restart|force-reload}" >&2
+	;;
 esac
 
-exit
-$RETVAL
+exit $RETVAL

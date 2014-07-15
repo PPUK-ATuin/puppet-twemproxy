@@ -8,12 +8,15 @@ define twemproxy::resource::nutcracker (
   $members              = '',
   $nutcracker_hash      = 'fnv1a_64',
   $pid_dir              = '/var/run/nutcracker',
+  $listen		= '0.0.0.0',
   $port                 = '22111',
   $redis                = true,
   $server_retry_timeout = '2000',
   $server_failure_limit = '3',
   $statsport            = '21111',
-  $twemproxy_timeout    = '300'
+  $twemproxy_timeout    = '300',
+  $service_state	= "stopped",
+  $service_onboot	= false,
 ) {
 
   File {
@@ -56,24 +59,22 @@ define twemproxy::resource::nutcracker (
     ensure  => "${ensure_real}",
     content => template('twemproxy/pool.erb',
                         'twemproxy/members.erb'),
-    notify  => Exec["reload-nutcracker-${name}"]
+    notify  => Service["nutcracker"]
+  }
+
+  # Setup the nutcracker service
+  service { "nutcracker":
+    enable => $service_boot,
+    ensure => $service_run,
   }
 
   # Creates nutcracker init for the current pool
-  file { "/etc/init.d/${name}":
+  file { "/etc/init.d/nutcracker":
     ensure  => "${ensure_real}",
     mode    => '0755',
     content => template('twemproxy/nutcracker.erb'),
-    notify  => Exec["reload-nutcracker-${name}"],
+    notify  => Service["nutcracker"],
     require => [ File["$log_dir"], File["$pid_dir"] ]
   }
 
-  # Reloads nutcracker if either the init or the config file has change.
-  exec { "/etc/init.d/${name} restart":
-    command     => "/etc/init.d/${name} restart",
-    refreshonly => true,
-    alias       => "reload-nutcracker-${name}",
-    require     => [ File["/etc/init.d/${name}"], File["/etc/nutcracker/${name}.yml"] ]
-    
-  }
 }
